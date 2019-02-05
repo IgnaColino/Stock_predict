@@ -6,7 +6,6 @@ Created on Mon Aug 27 18:18:50 2019
 """
 import time
 import pandas as pd
-import numpy as np
 import requests
 import os
 """This module has the function to get the daily price data for different
@@ -33,7 +32,7 @@ def get_adjusted_data(market='ASX', num_stocks=None):
 
         # Loop through stock list and concatenate
         for code in symbol_list.iloc[:, 0]:
-            if query_param[market]+code not in np.unique(data['Symbol']):
+            if query_param[market]+code not in data['Symbol'].unique():
                 # query structure
                 para = {"function": "TIME_SERIES_DAILY_ADJUSTED",
                         "symbol": query_param[market]+code,
@@ -54,9 +53,9 @@ def get_adjusted_data(market='ASX', num_stocks=None):
 
         # Print Summary and export to csv
         print('Nbr of datapoints:', len(data))
-        print('Nbr of Companies:', len(np.unique(data['Symbol'])))
+        print('Nbr of Companies:', len(data['Symbol'].unique()))
         print('Aprox years of data per company:',
-              np.around(len(data)/len(np.unique(data['Symbol']))/240, 2))
+              round(len(data)/len(data['Symbol'].unique())/240, 2))
 
         data.rename(columns={i: j for i, j in zip(data.columns, names)},
                     inplace=True)

@@ -31,3 +31,5 @@ def to_pg(df, table_name, con):
     data.seek(0)
     curs.copy_from(data, table_name, sep=',')
     curs.connection.commit()
+    print(len(df), 'daily records added for',
+          len(df.symbol.unique()), 'tickers')
