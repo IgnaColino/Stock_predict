@@ -16,14 +16,15 @@ from keras.layers import CuDNNLSTM
 from keras.layers import Dense, Dropout, BatchNormalization, Flatten
 from keras.optimizers import Adam
 from keras.callbacks import EarlyStopping, ModelCheckpoint, TensorBoard
-from keras.preprocessing.sequence import TimeseriesGenerator
+
+from data_gen import datagen, dataset
 
 
 class LSTM:
     '''LSTM model'''
 
-    def __init__(self, config, experiment):
-        super(LSTM, self).__init__(config, experiment)
+    def __init__(self, config):
+        self.config = config
         self.opt = None
         self.checkpoint = None
         self.tensorboard = None
@@ -96,7 +97,7 @@ class LSTM:
         self.model.add(CuDNNLSTM(self.model_params['lstm_neurons'][0],
                                  return_sequences=True,
                                  input_shape=(self.model_params['SEQ_LEN'],
-                                              self.x_train.shape[1])))
+                                              self.x_train.shape[1]-2)))
         self.model.add(Dropout(self.model_params['dropout']))
         self.model.add(BatchNormalization())
 
@@ -135,23 +136,23 @@ class LSTM:
 
     def input_data(self):
         '''timeseries data creation'''
-
-        self.x_train, self.y_train = self.data_factory.get_train_data()
-        self.x_test, self.y_test = self.data_factory.get_test_data()
-
-        self.y_train.replace({1: 2, 0: 1, -1: 0}, inplace=True)
-        self.y_test.replace({1: 2, 0: 1, -1: 0}, inplace=True)
+        data = dataset('asx')
+        data.add_target()
+        data.split()
+        self.x_train, self.y_train = data.traindata.iloc[:, :-1],\
+            data.traindata.iloc[:, -1]
+        self.x_test, self.y_test = data.testdata.iloc[:, :-1],\
+            data.testdata.iloc[:, -1]
 
         self.weights = self.get_weights(self.y_train)
 
-        self.train_data_gen =\
-            TimeseriesGenerator(np.array(self.x_train, dtype=np.float32),
-                                self.y_train.values,
-                                length=self.model_params['SEQ_LEN'])
-        self.test_data_gen =\
-            TimeseriesGenerator(np.array(self.x_test, dtype=np.float32),
-                                self.y_test.values,
-                                length=self.model_params['SEQ_LEN'])
+        self.ttl_batches = int((len(self.x_train) -
+                                self.model_params['SEQ_LEN']) /
+                               self.model_params['batch_size'])
+        self.train_data_gen = datagen(data.traindata,
+                                      gen_length=self.model_params['SEQ_LEN'])
+        self.test_data_gen = datagen(data.testdata,
+                                     gen_length=self.model_params['SEQ_LEN'])
 
     def train(self):
         '''train on the dataset provided'''
@@ -162,9 +163,6 @@ class LSTM:
 
         self.create_model()
 
-        self.ttl_batches = int((len(self.x_train) -
-                                self.model_params['SEQ_LEN']) /
-                               self.model_params['batch_size'])
         history = \
             self.model.fit_generator(
                 generator=self.train_data_gen,
@@ -173,6 +171,7 @@ class LSTM:
                 steps_per_epoch=np.min([self.ttl_batches,
                                         self.model_params['steps_per_epoch']]),
                 validation_data=self.test_data_gen, class_weight=self.weights,
+                validation_steps=100,
                 callbacks=[self.tensorboard, self.checkpoint,
                            self.early_stopping])
         print(history)

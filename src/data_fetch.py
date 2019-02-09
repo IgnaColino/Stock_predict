@@ -13,7 +13,7 @@ markets."""
 
 
 # Get the adjusted Data
-def get_adjusted_data(market='ASX', num_stocks=None):
+def get_adjusted_data(market='ASX', num_stocks=None, tickers=None):
     """This function outputs a csv file with the historical daily price data
     for the corresponding market. The stock codes are picked up from the csv
     files in the folder"""
@@ -28,8 +28,9 @@ def get_adjusted_data(market='ASX', num_stocks=None):
         data = pd.DataFrame(columns=['Symbol'])
         url = "https://www.alphavantage.co/query"
         if num_stocks is not None:
-            symbol_list = symbol_list.iloc[:num_stocks, :]
-
+            symbol_list = symbol_list.sample(num_stocks)
+        if tickers is not None:
+            symbol_list = pd.DataFrame(tickers)
         # Loop through stock list and concatenate
         for code in symbol_list.iloc[:, 0]:
             if query_param[market]+code not in data['Symbol'].unique():
