@@ -121,12 +121,12 @@ class LSTM:
         self.model.compile(loss='sparse_categorical_crossentropy',
                            optimizer=self.opt, metrics=['accuracy'])
         self.model.summary()
-        self.tensorboard = TensorBoard(log_dir=f"LSTM_Models/LSTM_logs/\
+        self.tensorboard = TensorBoard(log_dir=f"../LSTM_Models/LSTM_logs/\
                                        {self.model_params['NAME']}")
         # run tensorboard from the console with next comment to follow training
         # tensorboard --logdir=LSTM_Models/LSTM_logs/
 
-        self.checkpoint = ModelCheckpoint('LSTM_Models/Models/LSTM_T1-Best',
+        self.checkpoint = ModelCheckpoint('../LSTM_Models/Models/LSTM_T1-Best',
                                           monitor='val_acc', verbose=1,
                                           save_best_only=True, mode='max')
 
@@ -137,7 +137,9 @@ class LSTM:
     def input_data(self):
         '''timeseries data creation'''
         data = dataset('asx')
+        data.eng_features()
         data.add_target()
+        data.scale_features()
         data.split()
         self.x_train, self.y_train = data.traindata.iloc[:, :-1],\
             data.traindata.iloc[:, -1]
@@ -206,3 +208,8 @@ class LSTM:
                       y_lstm_pred)
 
         return cm_lstm, cr_lstm
+
+
+if __name__ == '__main__':
+    model = LSTM(1)
+    model.train()
