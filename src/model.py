@@ -137,10 +137,7 @@ class LSTM:
     def input_data(self):
         '''timeseries data creation'''
         data = dataset('asx')
-        data.eng_features()
-        data.add_target()
-        data.scale_features()
-        data.split()
+        data.prepare_dataset()
         self.x_train, self.y_train = data.traindata.iloc[:, :-1],\
             data.traindata.iloc[:, -1]
         self.x_test, self.y_test = data.testdata.iloc[:, :-1],\

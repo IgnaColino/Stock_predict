@@ -76,3 +76,14 @@ def CCI(df):
         mean_dev += (typical_price.shift(i)-sma20)
     mean_dev = mean_dev / 20
     df['CCI'] = (typical_price - sma20) / (0.015 * mean_dev)
+
+"""
+def T_SMA(df):
+    for col in df.columns:
+        if col[:3] in ['SMA', 'WMA':
+            df['T_'+col]=[1 if p > s elif p==s 0 else -1 
+                          for p, s in zip(df[col], df.adjusted_close)]
+
+def T_WMA(df):
+    
+"""
