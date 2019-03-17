@@ -15,9 +15,7 @@ import feature_engineering as fe
 import logging
 import traceback
 
-
 logging.basicConfig(filename='logfile.log', level=logging.INFO)
-"""to do: scale features and feature engineering"""
 
 
 class dataset:
@@ -100,8 +98,10 @@ class dataset:
 
 
 class datagen:
-    def __init__(self, df, gen_length=30):
+    def __init__(self, df, gen_length=30, start_date='2010-01-01',
+                 end_date=pd.datetime.now().date()):
         self.df = df
+        self.df = self.df.loc[self.df.date.between(start_date, end_date)]
         self.df.reset_index(drop=True, inplace=True)
         self.gen_length = gen_length
         self.idx = np.random.randint(0, self.df.index.max())
@@ -131,4 +131,5 @@ class datagen:
                                     {len(temp)}")
                     continue
             except Exception as e:
+                print(e)
                 traceback.print_exc()
