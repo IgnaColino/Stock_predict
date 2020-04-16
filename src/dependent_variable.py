@@ -5,15 +5,17 @@ Created on Sat Feb  9 16:36:49 2019
 @author: Ignacio
 """
 
-#Load libraries
+# Load libraries
 import pandas as pd
 import numpy as np
 
-def get_price_change(price_data, #pylint: disable-msg=R0914
+
+def get_price_change(price_data,  # pylint: disable-msg=R0914
                      days,
                      percentage_change,
                      price_col='adjusted_close',
                      is_index=False):
+
     """returns 1, 0 -1 for percentage change in price over the different set
     of days.
     Input:
@@ -46,7 +48,8 @@ def get_price_change(price_data, #pylint: disable-msg=R0914
             df_price[column_name] = 0
             cols.append(column_name)
 
-    price_change_df = pd.DataFrame(0, index=np.arange(len(price_data)), columns=cols)
+    price_change_df = pd.DataFrame(0, index=np.arange(len(price_data)),
+                                   columns=cols)
 
     for index, data in df_price.iterrows():
         for day in days:
@@ -59,7 +62,8 @@ def get_price_change(price_data, #pylint: disable-msg=R0914
                 if prev_price == 0.0:
                     price_change_percent = 0.0
                 else:
-                    price_change_percent = 100*(current_price - prev_price)/prev_price
+                    price_change_percent = 100*(current_price - prev_price) / \
+                        prev_price
 # =============================================================================
 #                 print("---------------------")
 #                 print("day", day)
@@ -67,13 +71,15 @@ def get_price_change(price_data, #pylint: disable-msg=R0914
 #                 print("current_price", current_price)
 #                 print("price_change_percent", price_change_percent)
 # =============================================================================
-                price_change_df.iloc[index]["price_change_percent_"+str(day)] = price_change_percent
+                price_change_df.iloc[index]["price_change_percent_" +
+                                            str(day)] = \
+                    price_change_percent
 
                 for price_change in percentage_change:
                     if abs(price_change_percent) > price_change:
                         column_name = "price_"+str(day)+"_"+str(price_change)
-                        price_change_df.iloc[index][column_name] = np.sign(price_change_percent/price_change)
-
+                        price_change_df.iloc[index][column_name] = \
+                            np.sign(price_change_percent/price_change)
     price_data.update(price_change_df)
 
     return price_data

@@ -7,23 +7,32 @@ Created on Tue Feb  5 10:15:11 2019
 
 import time
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sn
+import datetime as dt
+from update_dataset import kraken_tickers
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import classification_report
 from keras.models import Sequential
-from keras.layers import CuDNNLSTM
+from keras.layers import LSTM, CuDNNLSTM
 from keras.layers import Dense, Dropout, BatchNormalization, Flatten
 from keras.optimizers import Adam
 from keras.callbacks import EarlyStopping, ModelCheckpoint, TensorBoard
 
 from data_gen import datagen, dataset
+import logging
+
+kraken_tickers = ['BTC', 'ETH', 'XMR', 'XRP', 'XLM', 'LTC', 'EOS',
+                  'BCH', 'DASH', 'ETC', 'GNO', 'QTUM', 'REP', 'USDT']
+
+logging.basicConfig(filename='../Logs/model_train.log', level=logging.INFO)
+model_logger = logging.getLogger('model')
 
 
-class LSTM:
+class LSTM_model:
     '''LSTM model'''
-
-    def __init__(self, config):
+    def __init__(self, config, datasource):
         self.config = config
         self.opt = None
         self.checkpoint = None
@@ -36,6 +45,7 @@ class LSTM:
         self.weights = None
         self.train_data_gen = None
         self.test_data_gen = None
+        self.datasource = datasource
 
     def set_params(self):
         '''prepares the hypermarameters to be used by the model'''
@@ -93,7 +103,10 @@ class LSTM:
         '''create LSTM model'''
 
         self.model = Sequential()
-
+        '''self.model.add(LSTM(units=self.model_params['lstm_neurons'][0],
+                            return_sequences=True,
+                            input_shape=(self.model_params['SEQ_LEN'],
+                                         self.x_train.shape[1]-2)))'''
         self.model.add(CuDNNLSTM(self.model_params['lstm_neurons'][0],
                                  return_sequences=True,
                                  input_shape=(self.model_params['SEQ_LEN'],
@@ -103,7 +116,9 @@ class LSTM:
 
         if len(self.model_params['lstm_neurons']) > 1:
             for i in self.model_params['lstm_neurons'][1:]:
-
+                '''self.model.add(LSTM(units=i, return_sequences=True if i !=
+                                    self.model_params['lstm_neurons'][-1]
+                                    else False))'''
                 self.model.add(CuDNNLSTM(i, return_sequences=[True if i !=
                                          self.model_params['lstm_neurons'][-1]
                                          else False]))
@@ -126,7 +141,8 @@ class LSTM:
         # run tensorboard from the console with next comment to follow training
         # tensorboard --logdir=LSTM_Models/LSTM_logs/
 
-        self.checkpoint = ModelCheckpoint('../LSTM_Models/Models/LSTM_T1-Best',
+        self.checkpoint = ModelCheckpoint('../LSTM_Models/Models/LSTM_T1-Best-'
+                                          + self.datasource,
                                           monitor='val_acc', verbose=1,
                                           save_best_only=True, mode='max')
 
@@ -134,9 +150,19 @@ class LSTM:
             EarlyStopping(monitor='val_loss',
                           patience=self.model_params['patience'])
 
+    def load_model(self):
+        '''loading a trained model'''
+        self.create_model()
+
+        self.model.load_weights('../LSTM_Models/Models/LSTM_T1-Best-'
+                                + self.datasource)
+
+        self.model.compile(loss='sparse_categorical_crossentropy',
+                           optimizer=self.opt, metrics=['accuracy'])
+
     def input_data(self):
         '''timeseries data creation'''
-        data = dataset('asx')
+        data = dataset(self.datasource, tickers=kraken_tickers)  # TEST
         data.prepare_dataset()
         self.x_train, self.y_train = data.traindata.iloc[:, :-1],\
             data.traindata.iloc[:, -1]
@@ -149,9 +175,11 @@ class LSTM:
                                 self.model_params['SEQ_LEN']) /
                                self.model_params['batch_size'])
         self.train_data_gen = datagen(data.traindata,
-                                      gen_length=self.model_params['SEQ_LEN'])
+                                      gen_length=self.model_params['SEQ_LEN'],
+                                      shuffle=True)
         self.test_data_gen = datagen(data.testdata,
-                                     gen_length=self.model_params['SEQ_LEN'])
+                                     gen_length=self.model_params['SEQ_LEN'],
+                                     test=True, shuffle=True)
 
     def train(self):
         '''train on the dataset provided'''
@@ -159,7 +187,8 @@ class LSTM:
         self.set_params()
 
         self.input_data()
-
+        model_logger.info(f"Started training with\
+                          {self.x_train.symbol.unique()} tickers")
         self.create_model()
 
         history = \
@@ -174,21 +203,37 @@ class LSTM:
                 callbacks=[self.tensorboard, self.checkpoint,
                            self.early_stopping])
         print(history)
+        logging.info(f"Finished training, model saved")
 
-    def test(self):
+    def test(self, start_date=dt.datetime.today() -
+             dt.timedelta(days=15), end_date=dt.datetime.today()):
         '''test and return confusion_matrix and classification_report'''
 
-        self.model.load_weights('LSTM_Models/Models/LSTM_T1-Best')
-
-        self.model.compile(loss='sparse_categorical_crossentropy',
-                           optimizer=self.opt, metrics=['accuracy'])
-
-        y_lstm_pred = self.model.predict_generator(self.test_data_gen)
+        self.set_params()
+        data = dataset(self.datasource, tickers=kraken_tickers,
+                       max_date=end_date)  # TEST
+        data.prepare_test_dataset()
+        self.test_data_gen = datagen(data.sdf,
+                                     gen_length=self.model_params['SEQ_LEN'],
+                                     start_date=start_date)
+        self.x_train =\
+            self.test_data_gen.df.loc[self.test_data_gen.df.date.between(
+                start_date, end_date)].iloc[:, :-1]
+        self.y_train =\
+            self.test_data_gen.df.loc[self.test_data_gen.df.date.between(
+                start_date, end_date)].iloc[:, -1]
+        self.load_model()
+        y_lstm_pred =\
+            self.model.predict_generator(self.test_data_gen,
+                                         steps=len(self.test_data_gen))
+        logging.info(y_lstm_pred)
         y_lstm_pred = np.argmax(y_lstm_pred, axis=1)
-
+        self.test_data_gen.result = self.test_data_gen.result[:-10]
+        logging.info(y_lstm_pred)
+        logging.info(self.test_data_gen.result)
         print("LSTM: Predictions have finished")
 
-        cm_lstm = confusion_matrix(self.y_test[self.model_params['SEQ_LEN']:],
+        cm_lstm = confusion_matrix(self.test_data_gen.result,
                                    y_lstm_pred)
         o_acc = np.around(np.sum(np.diag(cm_lstm)) / np.sum(cm_lstm)*100, 1)
 
@@ -200,13 +245,72 @@ class LSTM:
         plt.ylabel('True Label', size=15)
         print(np.diag(cm_lstm).sum())
 
-        cr_lstm = classification_report(
-                      self.y_test[self.model_params['SEQ_LEN']:],
-                      y_lstm_pred)
-
+        cr_lstm = classification_report(self.test_data_gen.result,
+                                        y_lstm_pred)
+        print(cr_lstm)
         return cm_lstm, cr_lstm
+
+    def predict(self, start_date=dt.datetime.today().date(),
+                end_date=dt.datetime.today().date()):
+        self.set_params()
+        data = dataset(self.datasource, tickers=kraken_tickers,
+                       min_date=start_date, max_date=end_date)  # TEST
+        print("The dataset is", len(data), "datapoints long")
+        data.prepare_test_dataset()
+        self.test_data_gen = datagen(data.sdf,
+                                     gen_length=self.model_params['SEQ_LEN'],
+                                     start_date=start_date)
+        print(self.test_data_gen.df.head())
+        self.x_train =\
+            self.test_data_gen.df.loc[self.test_data_gen.df.date.between(
+                start_date, end_date)].iloc[:, :-1]
+        print(self.x_train.columns)
+        self.y_train =\
+            self.test_data_gen.df.loc[self.test_data_gen.df.date.between(
+                start_date, end_date)].iloc[:, -1]
+        self.load_model()
+        y_lstm_pred =\
+            self.model.predict_generator(self.test_data_gen,
+                                         steps=len(self.test_data_gen))
+        return self.test_data_gen.ticks, y_lstm_pred
+
+    def predict2(self, start_date=dt.datetime.today().date() -
+                 dt.timedelta(days=120),
+                 end_date=dt.datetime.today().date()):
+        self.set_params()
+        data = dataset(self.datasource, tickers=kraken_tickers,
+                       min_date=start_date, max_date=end_date)
+        print("The dataset is", len(data), "datapoints long")
+        data.prepare_test_dataset()
+        self.x_train = data.sdf.drop(['target'], axis=1)
+        self.x_train = np.array(self.x_train.iloc[-90:, :])
+        self.load_model()
+        predictions = pd.DataFrame(columns=['sell', 'hold', 'buy'])
+        results = pd.DataFrame(columns=['sym', 'date', 'target'])
+        for sym in data.sdf.symbol.unique():
+            temp = data.sdf.loc[data.sdf.symbol == sym]
+            for date in temp.date[90:]:
+                results =\
+                    results.append({'sym': sym, 'date': date,
+                                    'target':
+                                    temp.loc[temp.date == date,
+                                             ['adjusted_close']].values[0][0]},
+                                   ignore_index=True)
+                self.x_train = temp.loc[temp.date <= date].iloc[-90:, :]\
+                    .drop(['symbol', 'date', 'target'], axis=1)
+                self.x_train = np.array(self.x_train)
+                self.x_train =\
+                    np.reshape(self.x_train,
+                               (1, self.x_train.shape[0],
+                                self.x_train.shape[1])).astype('float32')
+                predictions = predictions.append(pd.DataFrame(
+                    self.model.predict(self.x_train),
+                    columns=['sell', 'hold', 'buy']), ignore_index=True)
+        results = pd.concat([results, predictions], axis=1)
+        return results
 
 
 if __name__ == '__main__':
-    model = LSTM(1)
+    # pass
+    model = LSTM_model(1, 'cry')
     model.train()
