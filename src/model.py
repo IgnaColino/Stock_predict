@@ -11,7 +11,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sn
 import datetime as dt
-from update_dataset import kraken_tickers
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import classification_report
 from keras.models import Sequential
@@ -201,7 +200,7 @@ class LSTM_model:
         '''test and return confusion_matrix and classification_report'''
 
         self.set_params()
-        data = dataset(self.datasource, tickers=kraken_tickers,
+        data = dataset(self.datasource,
                        max_date=end_date)  # TEST
         data.prepare_test_dataset()
         self.test_data_gen = datagen(data.sdf,
@@ -238,7 +237,7 @@ class LSTM_model:
     def predict(self, start_date=dt.datetime.today().date(),
                 end_date=dt.datetime.today().date()):
         self.set_params()
-        data = dataset(self.datasource, tickers=kraken_tickers,
+        data = dataset(self.datasource,
                        min_date=start_date, max_date=end_date)  # TEST
         print("The dataset is", len(data), "datapoints long")
         data.prepare_test_dataset()
@@ -263,7 +262,7 @@ class LSTM_model:
                  dt.timedelta(days=120),
                  end_date=dt.datetime.today().date()):
         self.set_params()
-        data = dataset(self.datasource, tickers=kraken_tickers,
+        data = dataset(self.datasource,
                        min_date=start_date, max_date=end_date)
         print("The dataset is", len(data), "datapoints long")
         data.prepare_test_dataset()
