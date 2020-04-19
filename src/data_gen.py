@@ -7,29 +7,18 @@ Created on Sat Feb  9 15:04:29 2019
 
 import pandas as pd
 import numpy as np
-from sqlalchemy import create_engine
-import ast
-import os
 from dependent_variable import get_price_change
 import feature_engineering as fe
-import logging
 import traceback
 import datetime as dt
 
-logging.basicConfig(filename='../Logs/data_generator.log', level=logging.INFO)
-datagen_logger = logging.getLogger('datagen')
 
 md = dt.datetime.today()-dt.timedelta(days=14)
 
 
 class dataset:
-    def __init__(self, table, min_date=None, max_date=md, tickers=None):
-        self.security = ast.literal_eval(os.getenv('PSQL_USER'))
-        self.conn = create_engine("postgresql://" +
-                                  self.security['user'] + ":" +
-                                  self.security['password'] +
-                                  "@localhost/stock_data")
-        self.df = pd.read_sql_table(table, self.conn)
+    def __init__(self, df, table, min_date=None, max_date=md, tickers=None):
+        self.df = df
         self.df.sort_values(['symbol', 'date'], inplace=True)
         if table != 'cry':
             self.df = self.df.loc[self.df.adjusted_close != 0]
@@ -185,15 +174,9 @@ class datagen:
                     temp.drop(['symbol', 'date'], axis=1, inplace=True)
                     x, y = np.array(temp.iloc[:, :-1]),\
                         np.array(temp.iloc[-1, -1])
-                    datagen_logger.info(f"{self.df.loc[self.idx].symbol}\
-                                           stock with {len(temp)}, {self.idx},\
-                                           {y}")
                     self.result = np.append(self.result,
                                             np.reshape(y, (1, 1)).astype(int),
                                             axis=0)
-                    datagen_logger.info(f"Saved {self.df.loc[self.idx].symbol}\
-                                           stock with {len(temp)}, {self.idx},\
-                                           {y}")
                     if self.test:
                         self.idx = np.random.randint(0, self.df.index.max())
                     else:
@@ -202,8 +185,6 @@ class datagen:
                                           x.shape[1])).astype('float32'),\
                         np.reshape(y, (1, 1)).astype(int)
                 else:
-                    datagen_logger.info(f"{self.df.loc[self.idx].symbol}\
-                                           stock with {len(temp)}, {self.idx}")
                     self.idx = self.idx+self.gen_length-len(temp)
                     continue
             except Exception as e:

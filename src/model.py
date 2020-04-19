@@ -19,16 +19,10 @@ from keras.layers import LSTM, CuDNNLSTM
 from keras.layers import Dense, Dropout, BatchNormalization, Flatten
 from keras.optimizers import Adam
 from keras.callbacks import EarlyStopping, ModelCheckpoint, TensorBoard
-
 from data_gen import datagen, dataset
-import logging
 
 kraken_tickers = ['BTC', 'ETH', 'XMR', 'XRP', 'XLM', 'LTC', 'EOS',
                   'BCH', 'DASH', 'ETC', 'GNO', 'QTUM', 'REP', 'USDT']
-
-logging.basicConfig(filename='../Logs/model_train.log', level=logging.INFO)
-model_logger = logging.getLogger('model')
-
 
 class LSTM_model:
     '''LSTM model'''
@@ -162,7 +156,7 @@ class LSTM_model:
 
     def input_data(self):
         '''timeseries data creation'''
-        data = dataset(self.datasource, tickers=kraken_tickers)  # TEST
+        data = dataset(df=self.datasource, table='SNP')  # TEST
         data.prepare_dataset()
         self.x_train, self.y_train = data.traindata.iloc[:, :-1],\
             data.traindata.iloc[:, -1]
@@ -187,8 +181,6 @@ class LSTM_model:
         self.set_params()
 
         self.input_data()
-        model_logger.info(f"Started training with\
-                          {self.x_train.symbol.unique()} tickers")
         self.create_model()
 
         history = \
@@ -203,7 +195,6 @@ class LSTM_model:
                 callbacks=[self.tensorboard, self.checkpoint,
                            self.early_stopping])
         print(history)
-        logging.info(f"Finished training, model saved")
 
     def test(self, start_date=dt.datetime.today() -
              dt.timedelta(days=15), end_date=dt.datetime.today()):
@@ -226,17 +217,12 @@ class LSTM_model:
         y_lstm_pred =\
             self.model.predict_generator(self.test_data_gen,
                                          steps=len(self.test_data_gen))
-        logging.info(y_lstm_pred)
         y_lstm_pred = np.argmax(y_lstm_pred, axis=1)
         self.test_data_gen.result = self.test_data_gen.result[:-10]
-        logging.info(y_lstm_pred)
-        logging.info(self.test_data_gen.result)
         print("LSTM: Predictions have finished")
-
         cm_lstm = confusion_matrix(self.test_data_gen.result,
                                    y_lstm_pred)
         o_acc = np.around(np.sum(np.diag(cm_lstm)) / np.sum(cm_lstm)*100, 1)
-
         plt.title(f'Confusion Matrix \n Accuracy={o_acc}%', size=18)
         sn.heatmap(cm_lstm, fmt=".0f", annot=True, cbar=False,
                    annot_kws={"size": 15}, xticklabels=['Sell', 'Hold', 'Buy'],
@@ -244,7 +230,6 @@ class LSTM_model:
         plt.xlabel('Predicted Label', size=15)
         plt.ylabel('True Label', size=15)
         print(np.diag(cm_lstm).sum())
-
         cr_lstm = classification_report(self.test_data_gen.result,
                                         y_lstm_pred)
         print(cr_lstm)
