@@ -13,7 +13,8 @@ import traceback
 import datetime as dt
 
 
-md = dt.datetime.today()-dt.timedelta(days=14)
+md = pd.to_datetime(pd.Timestamp.today().date(), utc=True) - \
+    pd.Timedelta('14 days')
 
 
 class dataset:
