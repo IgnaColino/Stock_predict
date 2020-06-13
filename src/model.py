@@ -295,6 +295,6 @@ class LSTM_model:
 
 
 if __name__ == '__main__':
-    # pass
-    model = LSTM_model(1, 'cry')
-    model.train()
+    pass
+    #model = LSTM_model(1, 'cry')
+    #model.train()

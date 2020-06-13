@@ -60,26 +60,20 @@ class dataset:
             if col != 'woy' and col != 'symbol' and col != 'date' and \
               col != 'target':
                 self.sdf.loc[col] = self.sdf[col].astype(float)
-                for ticker in self.sdf.symbol.unique():
-                    # if max > 1 and min< 0
-                    if (self.sdf.loc[self.sdf.symbol == ticker, col].max() > 1
-                        and self.sdf.loc[self.sdf.symbol == ticker,
-                                         col].min() < 0) and \
-                      self.sdf.loc[self.sdf.symbol == ticker, col].std() != 0:
-                        self.sdf.loc[self.sdf.symbol == ticker, col] = \
-                            (self.sdf.loc[self.sdf.symbol == ticker, col] -
-                             self.sdf.loc[self.sdf.symbol == ticker,
-                                          col].mean()) / \
-                            self.sdf.loc[self.sdf.symbol == ticker, col].std()
-                    elif (self.sdf.loc[self.sdf.symbol == ticker,
-                                       col].max() > 1 and
-                          self.sdf.loc[self.sdf.symbol == ticker,
-                                       col].min() >= 0 and
-                          self.sdf.loc[self.sdf.symbol == ticker,
-                                       col].std() != 0):
-                        self.sdf.loc[self.sdf.symbol == ticker, col] = \
-                            self.sdf.loc[self.sdf.symbol == ticker, col] / \
-                            self.sdf.loc[self.sdf.symbol == ticker, col].std()
+                # if max > 1 and min< 0
+                if (self.sdf.loc[:, col].max() > 1
+                    and self.sdf.loc[:, col].min() < 0) and \
+                    self.sdf.loc[:, col].std() != 0:
+                    self.sdf.loc[:, col] = \
+                        (self.sdf.loc[:, col] -
+                         self.sdf.loc[:, col].mean()) / \
+                        self.sdf.loc[:, col].std()
+                elif (self.sdf.loc[:, col].max() > 1 and
+                      self.sdf.loc[:, col].min() >= 0 and
+                      self.sdf.loc[:, col].std() != 0):
+                    self.sdf.loc[:, col] = \
+                        self.sdf.loc[:, col] / \
+                        self.sdf.loc[:, col].std()
             elif col == 'woy':
                 self.sdf[col] = self.sdf[col].astype(float)/52
         self.sdf.dropna(inplace=True)
