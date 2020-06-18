@@ -122,8 +122,11 @@ class dataset:
 
 
 class datagen:
-    def __init__(self, df, gen_length=30, start_date=dt.date(2010, 1, 1),
-                 end_date=dt.datetime.today().date(), test=False,
+    def __init__(self, df, gen_length=30,
+                 start_date=dt.datetime(2010, 1, 1, 0, 0, 0,
+                                        tzinfo=dt.timezone.utc),
+                 end_date=dt.datetime.now(dt.timezone.utc),
+                 test=False,
                  shuffle=False):
         self.df = df
         self.gen_length = gen_length

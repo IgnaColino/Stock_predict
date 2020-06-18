@@ -24,3 +24,16 @@ dataset = dataset(df, table='snp',
                                        tzinfo=dt.timezone.utc))
 dataset.prepare_dataset()
 data = dataset.sdf
+
+data2 = data.loc[
+    data.date.between(dt.datetime(2010, 1, 1, 0, 0, 0, tzinfo=dt.timezone.utc),
+                      dt.datetime.today())]
+print(data.date.iloc[0], dt.datetime(2010, 1, 1, 0, 0, 0, tzinfo=dt.timezone.utc),
+      dt.datetime.now(dt.timezone.utc))
+
+from data_gen import datagen
+
+datag = datagen(df=data)
+
+
+datag.next()
