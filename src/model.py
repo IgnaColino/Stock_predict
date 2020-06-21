@@ -39,6 +39,7 @@ class LSTM_model:
         self.train_data_gen = None
         self.test_data_gen = None
         self.datasource = datasource
+        self.set_params()
 
     def set_params(self):
         '''prepares the hypermarameters to be used by the model'''
@@ -100,10 +101,11 @@ class LSTM_model:
                             return_sequences=True,
                             input_shape=(self.model_params['SEQ_LEN'],
                                          self.x_train.shape[1]-2)))'''
-        self.model.add(CuDNNLSTM(self.model_params['lstm_neurons'][0],
-                                 return_sequences=True,
-                                 input_shape=(self.model_params['SEQ_LEN'],
-                                              self.x_train.shape[1]-2)))
+        self.model.add(
+            CuDNNLSTM(self.model_params['lstm_neurons'][0],
+                      return_sequences=True,
+                      input_shape=(self.model_params['SEQ_LEN'],
+                                   self.train_generator.df.shape[1]-3)))
         self.model.add(Dropout(self.model_params['dropout']))
         self.model.add(BatchNormalization())
 
@@ -155,41 +157,28 @@ class LSTM_model:
 
     def input_data(self):
         '''timeseries data creation'''
-        data = dataset(df=self.datasource, table='SNP')  # TEST
-        data.prepare_dataset()
-        self.x_train, self.y_train = data.traindata.iloc[:, :-1],\
-            data.traindata.iloc[:, -1]
-        self.x_test, self.y_test = data.testdata.iloc[:, :-1],\
-            data.testdata.iloc[:, -1]
+        self.weights = self.get_weights(self.train_generator.df.iloc[:, -1])
 
-        self.weights = self.get_weights(self.y_train)
-
-        self.ttl_batches = int((len(self.x_train) -
+        self.ttl_batches = int((len(self.train_generator.df) -
                                 self.model_params['SEQ_LEN']) /
                                self.model_params['batch_size'])
-        self.train_data_gen = datagen(data.traindata,
-                                      gen_length=self.model_params['SEQ_LEN'],
-                                      shuffle=True)
-        self.test_data_gen = datagen(data.testdata,
-                                     gen_length=self.model_params['SEQ_LEN'],
-                                     test=True, shuffle=True)
 
-    def train(self):
+    def train(self, train_gen, validation_gen):
         '''train on the dataset provided'''
-
-        self.set_params()
-
+        self.train_generator = train_gen
+        self.validation_generator = validation_gen
         self.input_data()
         self.create_model()
 
         history = \
             self.model.fit_generator(
-                generator=self.train_data_gen,
+                generator=self.train_generator,
                 epochs=self.model_params['epochs'],
                 shuffle=self.model_params['shuffle'],
                 steps_per_epoch=np.min([self.ttl_batches,
                                         self.model_params['steps_per_epoch']]),
-                validation_data=self.test_data_gen, class_weight=self.weights,
+                validation_data=self.validation_generator,
+                class_weight=self.weights,
                 validation_steps=100,
                 callbacks=[self.tensorboard, self.checkpoint,
                            self.early_stopping])
