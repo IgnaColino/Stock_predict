@@ -97,26 +97,26 @@ class LSTM_model:
         '''create LSTM model'''
 
         self.model = Sequential()
-        '''self.model.add(LSTM(units=self.model_params['lstm_neurons'][0],
+        self.model.add(LSTM(units=self.model_params['lstm_neurons'][0],
                             return_sequences=True,
                             input_shape=(self.model_params['SEQ_LEN'],
-                                         self.x_train.shape[1]-2)))'''
-        self.model.add(
+                                         self.train_generator.df.shape[1]-3)))
+        '''self.model.add(
             CuDNNLSTM(self.model_params['lstm_neurons'][0],
                       return_sequences=True,
                       input_shape=(self.model_params['SEQ_LEN'],
-                                   self.train_generator.df.shape[1]-3)))
+                                   self.train_generator.df.shape[1]-3)))'''
         self.model.add(Dropout(self.model_params['dropout']))
         self.model.add(BatchNormalization())
 
         if len(self.model_params['lstm_neurons']) > 1:
             for i in self.model_params['lstm_neurons'][1:]:
-                '''self.model.add(LSTM(units=i, return_sequences=True if i !=
+                self.model.add(LSTM(units=i, return_sequences=True if i !=
                                     self.model_params['lstm_neurons'][-1]
-                                    else False))'''
-                self.model.add(CuDNNLSTM(i, return_sequences=[True if i !=
+                                    else False))
+                '''self.model.add(CuDNNLSTM(i, return_sequences=[True if i !=
                                          self.model_params['lstm_neurons'][-1]
-                                         else False]))
+                                         else False]))'''
                 self.model.add(Dropout(self.model_params['dropout']))
                 self.model.add(BatchNormalization())
 
