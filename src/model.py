@@ -169,6 +169,7 @@ class LSTM_model:
                 shuffle=self.model_params['shuffle'],
                 validation_data=self.validation_generator,
                 steps_per_epoch=self.model_params['steps_per_epoch'],
+                validation_steps=self.model_params['steps_per_epoch'],
                 # class_weight=self.weights,
                 callbacks=[# self.tensorboard,
                            self.checkpoint,
