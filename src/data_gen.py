@@ -9,8 +9,9 @@ import pandas as pd
 import numpy as np
 from dependent_variable import get_price_change
 import feature_engineering as fe
-import traceback
 import datetime as dt
+from tensorflow.keras.utils import Sequence
+import math
 
 
 md = pd.to_datetime(pd.Timestamp.today().date(), utc=True) - \
@@ -121,14 +122,16 @@ class dataset:
         self.sdf.reset_index(drop=True, inplace=True)
 
 
-class datagen:
+class datagen(Sequence):
     def __init__(self, df, gen_length=30,
                  start_date=dt.datetime(2010, 1, 1, 0, 0, 0,
                                         tzinfo=dt.timezone.utc),
-                 end_date=dt.datetime.now(dt.timezone.utc),
-                 test=False,
-                 shuffle=False):
+                 end_date=dt.datetime.now(dt.timezone.utc), n_classes=3,
+                 test=False, shuffle=False, batch_size=32, n_channels=1):
         self.df = df
+        self.n_channels = n_channels
+        self.n_classes = n_classes
+        self.symbols = df.symbol.unique().tolist()
         self.gen_length = gen_length
         self.df = self.df.loc[
             self.df.date.between(start_date -
@@ -137,54 +140,59 @@ class datagen:
         self.df.sort_values(['symbol', 'date'], ascending=[True, True],
                             inplace=True)
         self.df.reset_index(drop=True, inplace=True)
-        self.idx = 0
         self.test = test
         self.result = np.empty((0, 1), int)
+        self.sub_list = [self.df.loc[self.df.symbol==j]
+                         .index[self.gen_length:].values.tolist() for j in
+                         self.df.symbol.unique()]
+        self.list_IDs = [item for sublist in self.sub_list 
+                         for item in sublist]
         self.ticks = []
         self.shuffle = shuffle
-        '''
-        for sym in self.df.symbol.unique():
-            self.ticks.extend(self.df.loc[self.df.symbol == sym]
-                              [self.gen_length-1:].symbol.values)'''
+        self.dim = (self.gen_length, self.df.shape[1]-3)
+        self.batch_size = batch_size
+        self.on_epoch_end()
 
     def __len__(self):
-        datas = []
-        for sym in self.df.symbol.unique():
-            datas.append(max(len(self.df.loc[self.df.symbol ==
-                                             sym][-self.gen_length:]) -
-                             (self.gen_length - 1), 0))
-        return sum(datas)
+        'Denotes the number of batches per epoch'
+        datas = [max(len(self.df.loc[self.df.symbol==i,:])\
+                     -self.gen_length,0) for i in self.symbols]
+        return math.ceil(sum(datas)/self.batch_size)
 
-    def __next__(self):
-        while True:
-            try:
-                if self.idx > self.df.index.max():
-                    self.idx = np.random.randint(0, self.df.index.max())
-                if self.shuffle:
-                    self.idx = np.random.randint(0, self.df.index.max())
-                temp = self.df.loc[(self.df.symbol ==
-                                    self.df.loc[self.idx].symbol)
-                                   & (self.df.date <=
-                                      self.df.loc[self.idx].date)]
-                if len(temp) >= self.gen_length:
-                    temp = temp.iloc[-self.gen_length:, :]
-                    self.ticks.append(temp.symbol.unique())
-                    temp.drop(['symbol', 'date'], axis=1, inplace=True)
-                    x, y = np.array(temp.iloc[:, :-1]),\
-                        np.array(temp.iloc[-1, -1])
-                    self.result = np.append(self.result,
-                                            np.reshape(y, (1, 1)).astype(int),
-                                            axis=0)
-                    if self.test:
-                        self.idx = np.random.randint(0, self.df.index.max())
-                    else:
-                        self.idx = self.idx+1
-                    return np.reshape(x, (1, x.shape[0],
-                                          x.shape[1])).astype('float32'),\
-                        np.reshape(y, (1, 1)).astype(int)
-                else:
-                    self.idx = self.idx+self.gen_length-len(temp)
-                    continue
-            except Exception as e:
-                print(e)
-                traceback.print_exc()
+    def __getitem__(self, index):
+        'Generate one batch of data'
+        # Generate indexes of the batch
+        indexes = self.indexes[index*self.batch_size:
+                               (index+1)*self.batch_size]
+        # Find list of IDs
+        list_IDs_temp = [self.list_IDs[k] for k in indexes]
+        # Generate data
+        X, y = self.__data_generation(list_IDs_temp)
+        return X, y
+
+    def on_epoch_end(self):
+        'Updates indexes after each epoch'
+        self.indexes = np.arange(len(self.list_IDs))
+        if self.shuffle == True:
+            np.random.shuffle(self.indexes)
+        self.indexes = self.indexes.tolist()
+
+
+    def __data_generation(self, list_IDs_temp):
+        'Generates data containing batch_size samples'
+        # X : (n_samples, *dim, n_channels)
+        # Initialization
+        X = np.empty((self.batch_size, *self.dim, self.n_channels))
+        y = np.empty((self.batch_size), dtype=int)
+
+        # Generate data
+        for i, ID in enumerate(list_IDs_temp):
+            # Store sample
+            X[i,] = np.reshape(self.df.iloc[ID-self.gen_length:ID,:]\
+                .drop(['symbol', 'date', 'target'], axis=1).to_numpy(),
+                (self.dim[0],self.dim[1],1))
+            # Store class
+            y[i] = self.df.iloc[ID].target
+        X=np.reshape(X, (self.batch_size, self.dim[0],self.dim[1]))
+        return X, y
+      # to_categorical(y, num_classes=self.n_classes)

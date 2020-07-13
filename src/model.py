@@ -13,11 +13,11 @@ import seaborn as sn
 import datetime as dt
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import classification_report
-from keras.models import Sequential
-from keras.layers import LSTM, CuDNNLSTM
-from keras.layers import Dense, Dropout, BatchNormalization, Flatten
-from keras.optimizers import Adam
-from keras.callbacks import EarlyStopping, ModelCheckpoint, TensorBoard
+from tensorflow.keras import Sequential
+from tensorflow.keras.layers import LSTM
+from tensorflow.keras.layers import Dense, Dropout, BatchNormalization, Flatten
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 from data_gen import datagen, dataset
 
 kraken_tickers = ['BTC', 'ETH', 'XMR', 'XRP', 'XLM', 'LTC', 'EOS',
@@ -57,7 +57,7 @@ class LSTM_model:
                 'patience': 100,
                 'lstm_neurons': [256, 256, 128],
                 'shuffle': True,
-                'batch_size': 128,
+                'batch_size': 32,
                 'steps_per_epoch': 50
                 }
         elif self.config == 2:
@@ -73,7 +73,7 @@ class LSTM_model:
                 'patience': 100,
                 'lstm_neurons': [256, 256, 128],
                 'shuffle': True,
-                'batch_size': 128,
+                'batch_size': 32,
                 'steps_per_epoch': 50
                 }
         else:
@@ -95,17 +95,11 @@ class LSTM_model:
 
     def create_model(self):
         '''create LSTM model'''
-
         self.model = Sequential()
         self.model.add(LSTM(units=self.model_params['lstm_neurons'][0],
                             return_sequences=True,
                             input_shape=(self.model_params['SEQ_LEN'],
                                          self.train_generator.df.shape[1]-3)))
-        '''self.model.add(
-            CuDNNLSTM(self.model_params['lstm_neurons'][0],
-                      return_sequences=True,
-                      input_shape=(self.model_params['SEQ_LEN'],
-                                   self.train_generator.df.shape[1]-3)))'''
         self.model.add(Dropout(self.model_params['dropout']))
         self.model.add(BatchNormalization())
 
@@ -114,9 +108,6 @@ class LSTM_model:
                 self.model.add(LSTM(units=i, return_sequences=True if i !=
                                     self.model_params['lstm_neurons'][-1]
                                     else False))
-                '''self.model.add(CuDNNLSTM(i, return_sequences=[True if i !=
-                                         self.model_params['lstm_neurons'][-1]
-                                         else False]))'''
                 self.model.add(Dropout(self.model_params['dropout']))
                 self.model.add(BatchNormalization())
 
@@ -131,16 +122,17 @@ class LSTM_model:
         self.model.compile(loss='sparse_categorical_crossentropy',
                            optimizer=self.opt, metrics=['accuracy'])
         self.model.summary()
-        self.tensorboard = TensorBoard(log_dir=f"../LSTM_Models/LSTM_logs/\
-                                       {self.model_params['NAME']}")
+        '''
+        self.tensorboard = TensorBoard(log_dir=f"./LSTM_Models/LSTM_logs/\
+                                       {self.model_params['NAME']}")'''
         # run tensorboard from the console with next comment to follow training
         # tensorboard --logdir=LSTM_Models/LSTM_logs/
 
-        self.checkpoint = ModelCheckpoint('../LSTM_Models/Models/LSTM_T1-Best-'
+        self.checkpoint = ModelCheckpoint('./LSTM_Models/Models/LSTM_T1-Best-'
                                           + self.datasource,
-                                          monitor='val_acc', verbose=1,
+                                          monitor='val_accuracy', verbose=1,
+                                          save_weights_only=True,
                                           save_best_only=True, mode='max')
-
         self.early_stopping =\
             EarlyStopping(monitor='val_loss',
                           patience=self.model_params['patience'])
@@ -149,7 +141,7 @@ class LSTM_model:
         '''loading a trained model'''
         self.create_model()
 
-        self.model.load_weights('../LSTM_Models/Models/LSTM_T1-Best-'
+        self.model.load_weights('./LSTM_Models/Models/LSTM_T1-Best-'
                                 + self.datasource)
 
         self.model.compile(loss='sparse_categorical_crossentropy',
@@ -171,16 +163,15 @@ class LSTM_model:
         self.create_model()
 
         history = \
-            self.model.fit_generator(
-                generator=self.train_generator,
+            self.model.fit(
+                x=self.train_generator,
                 epochs=self.model_params['epochs'],
                 shuffle=self.model_params['shuffle'],
-                steps_per_epoch=np.min([self.ttl_batches,
-                                        self.model_params['steps_per_epoch']]),
                 validation_data=self.validation_generator,
-                class_weight=self.weights,
-                validation_steps=100,
-                callbacks=[self.tensorboard, self.checkpoint,
+                steps_per_epoch=self.model_params['steps_per_epoch'],
+                # class_weight=self.weights,
+                callbacks=[# self.tensorboard,
+                           self.checkpoint,
                            self.early_stopping])
         print(history)
 
