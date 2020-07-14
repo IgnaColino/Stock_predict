@@ -195,4 +195,3 @@ class datagen(Sequence):
             y[i] = self.df.iloc[ID].target
         X=np.reshape(X, (self.batch_size, self.dim[0],self.dim[1]))
         return X, y
-      # to_categorical(y, num_classes=self.n_classes)

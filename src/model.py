@@ -82,7 +82,9 @@ class LSTM_model:
     @staticmethod
     def get_weights(dependent_var):
         '''calculate classification weights'''
-        classes, cnt = np.unique(dependent_var, return_counts=True, axis=0)
+        classes, cnt = np.unique(dependent_var, return_counts=True,
+                                 axis=0)
+        classes = classes.astype(int)
         weights = 1/(cnt/cnt.sum())
         weights = weights/weights.sum()
         return dict(zip(classes, weights))
@@ -170,7 +172,7 @@ class LSTM_model:
                 validation_data=self.validation_generator,
                 steps_per_epoch=self.model_params['steps_per_epoch'],
                 validation_steps=self.model_params['steps_per_epoch'],
-                # class_weight=self.weights,
+                class_weight=self.weights,
                 callbacks=[# self.tensorboard,
                            self.checkpoint,
                            self.early_stopping])
